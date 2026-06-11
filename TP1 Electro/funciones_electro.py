@@ -415,13 +415,131 @@ def graficar_patron_polar(frecuencias, lista_db, angulos, f_centro, title=None):
     ax.set_yticklabels(labels_radial, fontsize=9, fontweight='bold', color='dimgray')
     
     # Configurar las marcas angulares exteriores (cada 30°)
-    ax.set_xticks(np.radians([0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]))
+    ax.set_xticks(np.radians([0, 15, 30, 45, 60, 75, 90, 180, 
+                              270, 285, 300, 315, 330]))
     
     # Grilla tenue de fondo
     ax.grid(True, ls='-', alpha=0.15, color='gray', zorder=0)
     
     if title is None:
         title = f"Directividad Relativa (0 dB en eje) - Banda: {f_centro} Hz\n(Zona Trasera Sin Mediciones)"
+    ax.set_title(title, fontsize=12, pad=25, fontweight='bold')
+    
+    plt.tight_layout()
+    plt.show()
+
+
+def comparar_patron_polar(frecuencias, lista_db, angulos, lista_f_centro, title=None):
+    """
+    Grafica MÚLTIPLES patrones polares normalizados a 0 dB en el mismo gráfico.
+    
+    - frecuencias: Vector común de frecuencias.
+    - lista_db: Lista con los arrays de dB [db_0, db_30, db_60, db_90].
+    - angulos: Lista o array con los ángulos medidos [0, 30, 60, 90].
+    - lista_f_centro: Lista de frecuencias a comparar, ej: [250, 500, 1000, 4000].
+    - title: Título personalizado.
+    """
+    # Inicializamos el gráfico polar común
+    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(8, 8))
+    
+    # Convención acústica estándar (0° arriba, giro horario)
+    ax.set_theta_zero_location('N')
+    ax.set_theta_direction(-1)
+    
+    # Variable para rastrear la máxima atenuación global y ajustar la escala al final
+    max_atenuacion_global = -30
+    
+    # --- BUCLE PRINCIPAL: PROCESAR CADA FRECUENCIA SOLICITADA ---
+    for f_centro in lista_f_centro:
+        
+        # 1. Calcular límites de la banda de octava
+        f_inf = f_centro / np.sqrt(2)
+        f_sup = f_centro * np.sqrt(2)
+        mascara = (frecuencias >= f_inf) & (frecuencias <= f_sup)
+        
+        if not any(mascara):
+            print(f"Advertencia: No se encontraron frecuencias para la banda de {f_centro} Hz. Saltando.")
+            continue
+            
+        # Promediar nivel absoluto para esta banda específica
+        valores_absolutos = []
+        for db_curva in lista_db:
+            valores_absolutos.append(np.mean(db_curva[mascara]))
+            
+        angulos_arr = np.array(angulos)
+        valores_absolutos = np.array(valores_absolutos)
+        
+        # Normalización a 0 dB (Cada banda respecto a su propio eje)
+        idx_cero = np.where(angulos_arr == 0)[0]
+        if len(idx_cero) == 0:
+            print(f"Error: No se encontró la medición a 0 grados para la banda de {f_centro} Hz.")
+            return
+        
+        valor_referencia_0deg = valores_absolutos[idx_cero[0]]
+        valores_medidos = valores_absolutos - valor_referencia_0deg
+        
+        # 2. Lógica de espejado y zona nula (90° a 270°)
+        angulos_completos = []
+        valores_completos = []
+        
+        for ang, val in zip(angulos_arr, valores_medidos):
+            if 0 <= ang <= 90:
+                angulos_completos.append(ang)
+                valores_completos.append(val)
+                
+        angulos_completos.append(180)
+        valores_completos.append(np.nan) # Quiebre de línea para zona nula
+        
+        for ang, val in zip(angulos_arr, valores_medidos):
+            if 0 < ang <= 90:
+                angulos_completos.append(360 - ang)
+                valores_completos.append(val)
+                
+        angulos_completos.append(360)
+        valores_completos.append(0.0)
+        
+        # 3. Ordenar los vectores para el graficado continuo
+        angulos_completos = np.array(angulos_completos)
+        valores_completos = np.array(valores_completos)
+        indices_ordenados = np.argsort(angulos_completos)
+        
+        angulos_ordenados = angulos_completos[indices_ordenados]
+        valores_ordenados = valores_completos[indices_ordenados]
+        angulos_rad = np.radians(angulos_ordenados)
+        
+        # Actualizar el mínimo global si esta curva atenúa más que las anteriores
+        min_val = np.nanmin(valores_ordenados)
+        if min_val < max_atenuacion_global:
+            max_atenuacion_global = min_val
+            
+        # Formatear el nombre de la curva para la leyenda (ej: 1000 -> 1 kHz)
+        label_f = f"{f_centro} Hz" if f_centro < 1000 else f"{f_centro/1000:.1f} kHz".replace(".0", "")
+        
+        # Graficar esta línea en el plano común (Matplotlib cambia el color solo)
+        ax.plot(angulos_rad, valores_ordenados, linewidth=2, label=label_f, zorder=3)
+
+    # --- 4. CONFIGURACIÓN FINAL DE LA ESCALA Y LA GRILLA (POST-BUCLE) ---
+    # Redondeamos la peor atenuación al siguiente múltiplo de -10 dB
+    bottom_limit = min(-30, int(np.floor(max_atenuacion_global / 10.0) * 10))
+    ticks_radial = list(range(bottom_limit, 10, 10))
+    
+    # Aplicar límites fijos y pasos cada -10 dB
+    ax.set_rlim(bottom=bottom_limit, top=0)
+    ax.set_rticks(ticks_radial)
+    
+    labels_radial = [f"{t} dB" if t != 0 else "0 dB" for t in ticks_radial]
+    ax.set_yticklabels(labels_radial, fontsize=9, fontweight='bold', color='dimgray')
+    
+    # Configurar marcas angulares (cada 30°)
+    ax.set_xticks(np.radians([0, 15, 30, 45, 60, 75, 90, 180, 
+                              270, 285, 300, 315, 330]))
+    ax.grid(True, ls='-', alpha=0.15, color='gray', zorder=0)
+    
+    # Agregar la leyenda de colores (ubicada estratégicamente fuera del círculo para no tapar)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.08, 1.0), fontsize=10, framealpha=0.9)
+    
+    if title is None:
+        title = "Comparación de Patrones Polares (Directividad)"
     ax.set_title(title, fontsize=12, pad=25, fontweight='bold')
     
     plt.tight_layout()
