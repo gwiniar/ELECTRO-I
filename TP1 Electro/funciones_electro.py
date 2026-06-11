@@ -51,6 +51,16 @@ def importar_datos_smaart(archivo_path):
     return frecuencias, db
 
 # --- FUNCIONES DE GRAFICACION ELECTRICA ---
+def detectar_resonancia(frecuencias, magnitudes):
+    mascara_graves = frecuencias < 300
+    f_res = None
+    if any(mascara_graves):
+        idx_max = magnitudes[mascara_graves].argmax()
+        f_res = frecuencias[mascara_graves][idx_max]
+        mag_res = magnitudes[mascara_graves][idx_max]
+        
+    return f_res, mag_res
+        
 def graficar_ohm(frecuencias, magnitudes, title="Respuesta de Magnitud (Impedancia)"):
     """
     Grafica la frecuencia vs Impedancia en escala logarítmica.
@@ -260,6 +270,57 @@ def comparar_impedancias(frecuencias, mags_1, mags_2, title="Comparación de Imp
     
     
 # --- FUNCIONES DE GRAFICACION ACUSTICA ---
+def promedio_logaritmico_db(valores_db):
+    """
+    Calcula el promedio energético (logarítmico) de un set de valores en dB.
+    Equivale matemáticamente a la raíz cuadrada del promedio aritmético 
+    de los cuadrados de las presiones.
+    """
+    # Pasamos de dB a escala lineal de energía (presión al cuadrado)
+    energía = 10 ** (valores_db / 10.0)
+    # Sacamos el promedio aritmético de la energía
+    promedio_energia = np.mean(energía)
+    # Volvemos a la escala logarítmica de dB
+    return 10 * np.log10(promedio_energia)
+
+
+def escalar_curva(frecuencias, spl_curva, f_s, promedio_filtrado_1m):
+    """
+    Ancla y escala una curva completa de respuesta en frecuencia basándose en
+    una medición física real integrada en la banda de f_s a 10x f_s.
+    
+    - frecuencias: Array de NumPy con el espectro completo de frecuencias.
+    - spl_curva: Array de NumPy con la curva relativa (ej: la que da 10 dB).
+    - f_r: Frecuencia de resonancia o límite inferior del filtro.
+    - promedio_filrado_1m: Nivel SPL (dB) medido físicamente con el ruido rosa filtrado (corregido a 1m).
+    
+    Returns:
+    - spl_escalado: Array de NumPy con la curva final calibrada en SPL real.
+    - offset: El offset calculado en dB (para control o logs).
+    """
+    # 1. Definir los límites de la banda según el procedimiento (f_s a 10*f_s)
+    f_inf = f_s
+    f_sup = 10.0 * f_s
+    
+    # 2. Crear la máscara para aislar los datos dentro de esa banda
+    mascara = (frecuencias >= f_inf) & (frecuencias <= f_sup)
+    
+    if not any(mascara):
+        raise ValueError(f"Error: No se encontraron frecuencias en el rango [{f_inf:.1f} Hz - {f_sup:.1f} Hz].")
+    
+    # 3. Aislar los dB de la curva en esa banda y usa promedio_logaritmico_db para calcular su promedio acústico real
+    db_en_banda = spl_curva[mascara]
+    promedio_curva_banda = promedio_logaritmico_db(db_en_banda)
+    
+    # 4. Calcular el Offset (Diferencia entre lo real físico y lo relativo de la curva)
+    offset = promedio_filtrado_1m - promedio_curva_banda
+    
+    # 5. Escalado: Sumamos el offset a TODA la curva en un solo bloque (gracias a NumPy)
+    spl_escalado = spl_curva + offset
+    
+    return spl_escalado, offset
+
+
 def graficar_db(frecuencias, db, title="Respuesta en Frecuencia", ylabel="Nivel (dB)"):
     """
     Grafica Frecuencia vs dB para sistemas de audio.
