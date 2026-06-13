@@ -60,6 +60,30 @@ def detectar_resonancia(frecuencias, magnitudes):
         mag_res = magnitudes[mascara_graves][idx_max]
         
     return f_res, mag_res
+
+def detectar_zmin(frecuencias, magnitudes, f_res):
+    """
+    Detecta la impedancia mínima (Zmin) y su frecuencia correspondiente,
+    buscando únicamente a la derecha de la frecuencia de resonancia (f_res).
+    
+    - frecuencias: Array de NumPy con el espectro de frecuencias.
+    - magnitudes: Array de NumPy con la magnitud de la impedancia en Ohms.
+    - f_res: Frecuencia de resonancia (fs) obtenida previamente.
+    
+    Returns:
+    - f_zmin: Frecuencia del mínimo de impedancia (Hz).
+    - mag_zmin: Valor de la impedancia mínima (Ohms).
+      (Devuelve None, None si no se encuentra o f_res es inválido).
+    """
+    if f_res is not None:
+        mascara_post_fs = frecuencias > f_res
+        if any(mascara_post_fs):
+            idx_min = magnitudes[mascara_post_fs].argmin()
+            f_zmin = frecuencias[mascara_post_fs][idx_min]
+            mag_zmin = magnitudes[mascara_post_fs][idx_min]
+            return f_zmin, mag_zmin
+            
+    return None, None
         
 def graficar_ohm(frecuencias, magnitudes, title="Respuesta de Magnitud (Impedancia)"):
     """
@@ -102,40 +126,30 @@ def graficar_ohm(frecuencias, magnitudes, title="Respuesta de Magnitud (Impedanc
                      arrowprops=dict(arrowstyle="->", color='k', lw=1.2))
         
     # --- DETECTAR Y MARCAR LA RESONANCIA ---
-    mascara_graves = frecuencias < 300
-    f_res = None
-    if any(mascara_graves):
-        idx_max = magnitudes[mascara_graves].argmax()
-        f_res = frecuencias[mascara_graves][idx_max]
-        mag_res = magnitudes[mascara_graves][idx_max]
+    f_res, mag_res = detectar_resonancia(frecuencias, magnitudes)
         
-        if mag_res <= limite_y:
-            plt.scatter(f_res, mag_res, color='k', s=0, zorder=4)
-            # xytext=(0, 40) tira la flecha recto desde arriba para no pisar las laderas
-            plt.annotate(f'Resonancia\n({f_res:.1f} Hz, {mag_res:.1f} $\\Omega$)', 
-                         xy=(f_res, mag_res), 
-                         xytext=(0, 40), textcoords='offset points',
-                         fontsize=10, fontweight='bold', color='k',
-                         ha='center', va='bottom',
-                         arrowprops=dict(arrowstyle="->", color='k', lw=1.2))
+    if mag_res <= limite_y:
+        plt.scatter(f_res, mag_res, color='k', s=0, zorder=4)
+        # xytext=(0, 40) tira la flecha recto desde arriba para no pisar las laderas
+        plt.annotate(f'Resonancia\n({f_res:.1f} Hz, {mag_res:.1f} $\\Omega$)', 
+                     xy=(f_res, mag_res), 
+                     xytext=(0, 40), textcoords='offset points',
+                     fontsize=10, fontweight='bold', color='k',
+                     ha='center', va='bottom',
+                     arrowprops=dict(arrowstyle="->", color='k', lw=1.2))
             
-    # --- REQUISITO B: VALOR DE MÍNIMA IMPEDANCIA (Zmin) DESPUÉS DE FS ---
-    if f_res is not None:
-        mascara_post_fs = frecuencias > f_res
-        if any(mascara_post_fs):
-            idx_min = magnitudes[mascara_post_fs].argmin()
-            f_zmin = frecuencias[mascara_post_fs][idx_min]
-            mag_zmin = magnitudes[mascara_post_fs][idx_min]
+    # --- VALOR DE MÍNIMA IMPEDANCIA (Zmin) DESPUÉS DE FS ---
+    f_zmin, mag_zmin = detectar_zmin(frecuencias, magnitudes, f_res)
             
-            if mag_zmin <= limite_y:
-                plt.scatter(f_zmin, mag_zmin, color='k', s=0, zorder=4)
-                # Se desplaza arriba y a la derecha para librar la zona del valle
-                plt.annotate(f'$Z_{{min}}$\n({f_zmin:.1f} Hz, {mag_zmin:.1f} $\\Omega$)', 
-                             xy=(f_zmin, mag_zmin), 
-                             xytext=(30, -35), textcoords='offset points',
-                             fontsize=10, fontweight='bold', color='k',
-                             ha='left', va='bottom',
-                             arrowprops=dict(arrowstyle="->", color='k', lw=1.2))
+    if mag_zmin <= limite_y:
+        plt.scatter(f_zmin, mag_zmin, color='k', s=0, zorder=4)
+        # Se desplaza arriba y a la derecha para librar la zona del valle
+        plt.annotate(f'$Z_{{min}}$\n({f_zmin:.1f} Hz, {mag_zmin:.1f} $\\Omega$)', 
+                     xy=(f_zmin, mag_zmin), 
+                     xytext=(30, -35), textcoords='offset points',
+                     fontsize=10, fontweight='bold', color='k',
+                     ha='left', va='bottom',
+                     arrowprops=dict(arrowstyle="->", color='k', lw=1.2))
         
     plt.title(title, fontsize=13, pad=15)
     
@@ -178,16 +192,13 @@ def graficar_fase(frecuencias, fases, magnitudes, title="Respuesta de Fase"):
     
     # --- MARCAR LA FRECUENCIA DE RESONANCIA (fs) ---
     # Buscamos el pico de impedancia en graves (f < 300 Hz) para localizar fs
-    mascara_graves = frecuencias < 300
-    if any(mascara_graves):
-        idx_max = magnitudes[mascara_graves].argmax()
-        f_res = frecuencias[mascara_graves][idx_max]
+    f_res, mag_res = detectar_resonancia(frecuencias, magnitudes)
         
-        # Dibujamos una línea vertical punteada en la frecuencia de resonancia
-        plt.axvline(x=f_res, color='k', linestyle='--', alpha=0.7, linewidth=1.5, zorder=2)
-        plt.text(f_res * 1.1, 150, f'$f_s$: {f_res:.1f} Hz', 
-                 fontsize=10, fontweight='bold', color='k', 
-                 bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
+    # Dibujamos una línea vertical punteada en la frecuencia de resonancia
+    plt.axvline(x=f_res, color='k', linestyle='--', alpha=0.7, linewidth=1.5, zorder=2)
+    plt.text(f_res * 1.1, 150, f'$f_s$: {f_res:.1f} Hz', 
+             fontsize=10, fontweight='bold', color='k', 
+             bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
 
     plt.title(title, fontsize=13, pad=15)
     plt.grid(True, which="both", ls=":", alpha=0.4, color='gray', zorder=2)
@@ -227,29 +238,21 @@ def comparar_impedancias(frecuencias, mags_1, mags_2, title="Comparación de Imp
     plt.ylabel('Impedancia Magnitud (|Z|)', fontsize=11)
     
     # --- DETECCION Y MARCADO DE RESONANCIAS ---
-    mascara_graves = frecuencias < 300
-    
-    if any(mascara_graves):
-        # --- Resonancia Curva 1 (Azul) -> Se anota hacia la DERECHA y ARRIBA ---
-        idx_1 = mags_1[mascara_graves].argmax()
-        f_res1 = frecuencias[mascara_graves][idx_1]
-        mag_res1 = mags_1[mascara_graves][idx_1]
+    f_res1, mag_res1 = detectar_resonancia(frecuencias, mags_1)
         
-        if mag_res1 <= limite_y:
-            plt.scatter(f_res1, mag_res1, color='k', s=0, zorder=4)
+    if mag_res1 <= limite_y:
+        plt.scatter(f_res1, mag_res1, color='k', s=0, zorder=4)
             
-            # xytext=(100, 35) significa: mover 100 píxeles a la izquierda y 35 hacia arriba desde el pico
-            plt.annotate(f'({f_res1:.1f} Hz, {mag_res1:.1f} $\\Omega$)', 
-                         xy=(f_res1, mag_res1), 
-                         xytext=(100, 35), textcoords='offset points',
-                         fontsize=9, fontweight='bold', color='k',
-                         ha='right', va='bottom', # Alinea el texto a la izquierda de la flecha
-                         arrowprops=dict(arrowstyle="->", color='k', lw=1.2))
+        # xytext=(100, 35) significa: mover 100 píxeles a la izquierda y 35 hacia arriba desde el pico
+        plt.annotate(f'({f_res1:.1f} Hz, {mag_res1:.1f} $\\Omega$)', 
+                     xy=(f_res1, mag_res1), 
+                     xytext=(100, 35), textcoords='offset points',
+                     fontsize=9, fontweight='bold', color='k',
+                     ha='right', va='bottom', # Alinea el texto a la izquierda de la flecha
+                     arrowprops=dict(arrowstyle="->", color='k', lw=1.2))
             
         # --- Resonancia Curva 2 (Rojo) -> Se anota hacia la IZQUIERDA y ARRIBA ---
-        idx_2 = mags_2[mascara_graves].argmax()
-        f_res2 = frecuencias[mascara_graves][idx_2]
-        mag_res2 = mags_2[mascara_graves][idx_2]
+        f_res2, mag_res2 = detectar_resonancia(frecuencias, mags_2)
         
         if mag_res2 <= limite_y:
             plt.scatter(f_res2, mag_res2, color='k', s=0, zorder=4)
@@ -270,52 +273,61 @@ def comparar_impedancias(frecuencias, mags_1, mags_2, title="Comparación de Imp
     
     
 # --- FUNCIONES DE GRAFICACION ACUSTICA ---
-def promedio_logaritmico_db(valores_db):
+def promedio_logaritmico_butterworth(frecuencias, valores_db, f_inf, f_sup):
     """
-    Calcula el promedio energético (logarítmico) de un set de valores en dB.
-    Equivale matemáticamente a la raíz cuadrada del promedio aritmético 
-    de los cuadrados de las presiones.
+    Calcula el promedio energético ponderado por un filtro Butterworth 
+    de 4to orden (24 dB/oct) para aislar la banda de interés.
     """
-    # Pasamos de dB a escala lineal de energía (presión al cuadrado)
-    energía = 10 ** (valores_db / 10.0)
-    # Sacamos el promedio aritmético de la energía
-    promedio_energia = np.mean(energía)
-    # Volvemos a la escala logarítmica de dB
+    # 1. Generar el filtro interno
+    h_hp2 = 1.0 / (1.0 + (f_inf / frecuencias) ** 8)
+    h_lp2 = 1.0 / (1.0 + (frecuencias / f_sup) ** 8)
+    filtro_energia = h_hp2 * h_lp2
+    
+    # 2. Pasar a lineal, ponderar, promediar y volver a dB
+    energia = 10 ** (np.array(valores_db) / 10.0)
+    promedio_energia = np.sum(energia * filtro_energia) / np.sum(filtro_energia)
+    
     return 10 * np.log10(promedio_energia)
 
 
 def escalar_curva(frecuencias, spl_curva, f_s, promedio_filtrado_1m):
     """
     Ancla y escala una curva completa de respuesta en frecuencia basándose en
-    una medición física real integrada en la banda de f_s a 10x f_s.
+    una medición física real filtrada con un Butterworth de 24 dB/oct en la banda f_s a 10x f_s.
     
     - frecuencias: Array de NumPy con el espectro completo de frecuencias.
     - spl_curva: Array de NumPy con la curva relativa (ej: la que da 10 dB).
-    - f_r: Frecuencia de resonancia o límite inferior del filtro.
-    - promedio_filrado_1m: Nivel SPL (dB) medido físicamente con el ruido rosa filtrado (corregido a 1m).
+    - f_s: Frecuencia de resonancia o límite inferior del filtro.
+    - promedio_filtrado_1m: Nivel SPL (dB) medido físicamente con el ruido rosa filtrado (corregido a 1m).
     
     Returns:
     - spl_escalado: Array de NumPy con la curva final calibrada en SPL real.
-    - offset: El offset calculado en dB (para control o logs).
+    - offset: El offset calculado en dB.
     """
-    # 1. Definir los límites de la banda según el procedimiento (f_s a 10*f_s)
+    # 1. Definir las frecuencias de corte del filtro banda
     f_inf = f_s
     f_sup = 10.0 * f_s
     
-    # 2. Crear la máscara para aislar los datos dentro de esa banda
-    mascara = (frecuencias >= f_inf) & (frecuencias <= f_sup)
+    # 2. Generar la respuesta en frecuencia del filtro Butterworth de 4to orden (24 dB/oct)
+    # Usamos el exponente 8 porque la ecuación de potencia es 2 * orden (2 * 4 = 8)
+    h_hp2 = 1.0 / (1.0 + (f_inf / frecuencias) ** 8)  # Pasa-Altos
+    h_lp2 = 1.0 / (1.0 + (frecuencias / f_sup) ** 8)  # Pasa-Bajos
+    filtro_energia = h_hp2 * h_lp2                    # Filtro Banda Completo
     
-    if not any(mascara):
-        raise ValueError(f"Error: No se encontraron frecuencias en el rango [{f_inf:.1f} Hz - {f_sup:.1f} Hz].")
+    # 3. Pasar la curva relativa a escala lineal de energía (presión al cuadrado)
+    energia_curva = 10 ** (spl_curva / 10.0)
     
-    # 3. Aislar los dB de la curva en esa banda y usa promedio_logaritmico_db para calcular su promedio acústico real
-    db_en_banda = spl_curva[mascara]
-    promedio_curva_banda = promedio_logaritmico_db(db_en_banda)
+    # 4. Promediado acústico real emulando el filtro
+    # ¡OJO! Si hiciéramos np.mean(), los ceros de los extremos diluirían el valor según el largo del array.
+    # Usamos un promedio PONDERADO: dividimos la energía filtrada por la suma del filtro.
+    # Esto hace que la función sea 100% inmune al ancho de banda del vector.
+    promedio_energia_banda = np.sum(energia_curva * filtro_energia) / np.sum(filtro_energia)
+    promedio_curva_banda = 10 * np.log10(promedio_energia_banda)
     
-    # 4. Calcular el Offset (Diferencia entre lo real físico y lo relativo de la curva)
+    # 5. Calcular el Offset (Diferencia entre lo real físico y lo emulado por el filtro)
     offset = promedio_filtrado_1m - promedio_curva_banda
     
-    # 5. Escalado: Sumamos el offset a TODA la curva en un solo bloque (gracias a NumPy)
+    # 6. Escalado: Sumamos el offset a TODA la curva original
     spl_escalado = spl_curva + offset
     
     return spl_escalado, offset
@@ -384,26 +396,29 @@ def comparar_db(frecuencias, lista_db, labels=None, title="Comparación de Respu
     plt.tight_layout()
     plt.show()
     
-
+    
 def graficar_patron_polar(frecuencias, lista_db, angulos, f_centro, title=None):
     """
     Grafica el patrón polar normalizado a 0 dB en el eje (0°).
+    Busca el centro de banda de tercio de octava más cercano en los datos ya promediados.
+    
     - Espeja de 0-90° hacia 270-360° y deja nulo el sector trasero.
     - Grilla radial fija estrictamente con pasos de -10 dB.
     """
-    # 1. Calcular límites matemáticos de la banda de octava
-    f_inf = f_centro / np.sqrt(2)
-    f_sup = f_centro * np.sqrt(2)
-    mascara = (frecuencias >= f_inf) & (frecuencias <= f_sup)
+    # Aseguramos que frecuencias sea un array de NumPy
+    frecuencias = np.asarray(frecuencias)
     
-    if not any(mascara):
-        print(f"Error: No se encontraron frecuencias para la banda de {f_centro} Hz.")
-        return
+    # 1. ENCONTRAR EL ÍNDICE DE LA FRECUENCIA MÁS CERCANA
+    # (Mapea tu f_centro nominal con el centro real que guardó Smaart)
+    idx_f = np.argmin(np.abs(frecuencias - f_centro))
+    f_real = frecuencias[idx_f]
+    
+    print(f"-> Frecuencia solicitada: {f_centro} Hz | Centro de tercio encontrado: {f_real:.2f} Hz")
         
-    # Promediar el nivel absoluto en la banda para cada ángulo medido
+    # Extraer el nivel absoluto en ese índice específico para cada curva/ángulo
     valores_absolutos = []
     for db_curva in lista_db:
-        valores_absolutos.append(np.mean(db_curva[mascara]))
+        valores_absolutos.append(db_curva[idx_f])
         
     angulos = np.array(angulos)
     valores_absolutos = np.array(valores_absolutos)
@@ -427,7 +442,7 @@ def graficar_patron_polar(frecuencias, lista_db, angulos, f_centro, title=None):
             valores_completos.append(val)
             
     angulos_completos.append(180)
-    valores_completos.append(np.nan) # Quiebre de línea para zona nula
+    valores_completos.append(np.nan) # Quiebre de línea para la zona trasera vacía
     
     for ang, val in zip(angulos, valores_medidos):
         if 0 < ang <= 90:
@@ -457,33 +472,23 @@ def graficar_patron_polar(frecuencias, lista_db, angulos, f_centro, title=None):
     ax.plot(angulos_rad, valores_ordenados, linewidth=2.5, color='crimson', zorder=3)
     
     # --- CONFIGURACIÓN DE LA ESCALA FIJA CADA -10 dB ---
-    # Buscamos la máxima atenuación real (ignorando los NaN de la zona trasera)
     min_val = np.nanmin(valores_ordenados)
-    
-    # Redondeamos al siguiente múltiplo de -10 (ej: -23dB se va a -30dB)
-    # Dejamos un piso estético mínimo de -30dB para que no quede un gráfico diminuto
     bottom_limit = min(-30, int(np.floor(min_val / 10.0) * 10))
-    
-    # Generamos la lista de pasos exactos desde el centro hacia el borde (0 dB)
     ticks_radial = list(range(bottom_limit, 10, 10))
     
-    # Aplicamos los límites y los ticks al eje radial
     ax.set_rlim(bottom=bottom_limit, top=0)
     ax.set_rticks(ticks_radial)
     
-    # Formateamos los carteles para que digan "dB" de forma elegante
     labels_radial = [f"{t} dB" if t != 0 else "0 dB" for t in ticks_radial]
     ax.set_yticklabels(labels_radial, fontsize=9, fontweight='bold', color='dimgray')
     
-    # Configurar las marcas angulares exteriores (cada 30°)
     ax.set_xticks(np.radians([0, 15, 30, 45, 60, 75, 90, 180, 
                               270, 285, 300, 315, 330]))
     
-    # Grilla tenue de fondo
     ax.grid(True, ls='-', alpha=0.15, color='gray', zorder=0)
     
     if title is None:
-        title = f"Directividad Relativa (0 dB en eje) - Banda: {f_centro} Hz\n(Zona Trasera Sin Mediciones)"
+        title = f"Directividad Relativa (0 dB en eje) - Tercio de Octava: {f_centro} Hz"
     ax.set_title(title, fontsize=12, pad=25, fontweight='bold')
     
     plt.tight_layout()
@@ -493,13 +498,16 @@ def graficar_patron_polar(frecuencias, lista_db, angulos, f_centro, title=None):
 def comparar_patron_polar(frecuencias, lista_db, angulos, lista_f_centro, title=None):
     """
     Grafica MÚLTIPLES patrones polares normalizados a 0 dB en el mismo gráfico.
+    Busca los centros de banda de tercio de octava más cercanos en los datos ya promediados.
     
-    - frecuencias: Vector común de frecuencias.
-    - lista_db: Lista con los arrays de dB [db_0, db_30, db_60, db_90].
-    - angulos: Lista o array con los ángulos medidos [0, 30, 60, 90].
-    - lista_f_centro: Lista de frecuencias a comparar, ej: [250, 500, 1000, 4000].
+    - frecuencias: Vector común de frecuencias de Smaart.
+    - lista_db: Lista con los arrays de dB [db_0, db_15, db_30, ...].
+    - angulos: Lista o array con los ángulos medidos [0, 15, 30, ...].
+    - lista_f_centro: Lista de frecuencias nominales a comparar, ej: [1000, 2000, 4000].
     - title: Título personalizado.
     """
+    frecuencias = np.asarray(frecuencias)
+    
     # Inicializamos el gráfico polar común
     fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(8, 8))
     
@@ -513,24 +521,21 @@ def comparar_patron_polar(frecuencias, lista_db, angulos, lista_f_centro, title=
     # --- BUCLE PRINCIPAL: PROCESAR CADA FRECUENCIA SOLICITADA ---
     for f_centro in lista_f_centro:
         
-        # 1. Calcular límites de la banda de octava
-        f_inf = f_centro / np.sqrt(2)
-        f_sup = f_centro * np.sqrt(2)
-        mascara = (frecuencias >= f_inf) & (frecuencias <= f_sup)
+        # 1. ENCONTRAR EL ÍNDICE DE LA FRECUENCIA MÁS CERCANA
+        idx_f = np.argmin(np.abs(frecuencias - f_centro))
+        f_real = frecuencias[idx_f]
         
-        if not any(mascara):
-            print(f"Advertencia: No se encontraron frecuencias para la banda de {f_centro} Hz. Saltando.")
-            continue
+        print(f"-> Procesando: {f_centro} Hz | Centro de tercio real: {f_real:.2f} Hz")
             
-        # Promediar nivel absoluto para esta banda específica
+        # Extraer el nivel absoluto en ese índice específico para cada ángulo
         valores_absolutos = []
         for db_curva in lista_db:
-            valores_absolutos.append(np.mean(db_curva[mascara]))
+            valores_absolutos.append(db_curva[idx_f])
             
         angulos_arr = np.array(angulos)
         valores_absolutos = np.array(valores_absolutos)
         
-        # Normalización a 0 dB (Cada banda respecto a su propio eje)
+        # Normalización a 0 dB (Cada banda respecto a su propio eje de 0°)
         idx_cero = np.where(angulos_arr == 0)[0]
         if len(idx_cero) == 0:
             print(f"Error: No se encontró la medición a 0 grados para la banda de {f_centro} Hz.")
@@ -573,34 +578,31 @@ def comparar_patron_polar(frecuencias, lista_db, angulos, lista_f_centro, title=
         if min_val < max_atenuacion_global:
             max_atenuacion_global = min_val
             
-        # Formatear el nombre de la curva para la leyenda (ej: 1000 -> 1 kHz)
+        # --- EL CAMBIO SOLICITADO AQUÍ: SE USA F_CENTRO NOMINAL EN VEZ DE F_REAL ---
         label_f = f"{f_centro} Hz" if f_centro < 1000 else f"{f_centro/1000:.1f} kHz".replace(".0", "")
+        # --------------------------------------------------------------------------
         
-        # Graficar esta línea en el plano común (Matplotlib cambia el color solo)
+        # Graficar esta línea en el plano común
         ax.plot(angulos_rad, valores_ordenados, linewidth=2, label=label_f, zorder=3)
 
     # --- 4. CONFIGURACIÓN FINAL DE LA ESCALA Y LA GRILLA (POST-BUCLE) ---
-    # Redondeamos la peor atenuación al siguiente múltiplo de -10 dB
     bottom_limit = min(-30, int(np.floor(max_atenuacion_global / 10.0) * 10))
     ticks_radial = list(range(bottom_limit, 10, 10))
     
-    # Aplicar límites fijos y pasos cada -10 dB
     ax.set_rlim(bottom=bottom_limit, top=0)
     ax.set_rticks(ticks_radial)
     
     labels_radial = [f"{t} dB" if t != 0 else "0 dB" for t in ticks_radial]
     ax.set_yticklabels(labels_radial, fontsize=9, fontweight='bold', color='dimgray')
     
-    # Configurar marcas angulares (cada 30°)
     ax.set_xticks(np.radians([0, 15, 30, 45, 60, 75, 90, 180, 
                               270, 285, 300, 315, 330]))
     ax.grid(True, ls='-', alpha=0.15, color='gray', zorder=0)
     
-    # Agregar la leyenda de colores (ubicada estratégicamente fuera del círculo para no tapar)
     ax.legend(loc="upper left", bbox_to_anchor=(1.08, 1.0), fontsize=10, framealpha=0.9)
     
     if title is None:
-        title = "Comparación de Patrones Polares (Directividad)"
+        title = "Comparación de Patrones Polares (Tercios de Octava)"
     ax.set_title(title, fontsize=12, pad=25, fontweight='bold')
     
     plt.tight_layout()
