@@ -18,22 +18,23 @@ angulos_medidos = [0, 15, 30, 45, 60, 75, 90]
 angulos_labels = ['0°', '15°', '30°', '45°', '60°', '75°', '90°']
 
 # 4. Definir la frecuencia central del tercio de octava a analizar o la lista de frecuencias
-frecuencia_objetivo = 2000
-frecuencias_a_comparar = [500, 1000, 2000, 4000, 8000, 16000]
+frecuencia_objetivo = 1000
+frecuencias_a_comparar = [125, 250, 500, 1000, 2000, 4000, 8000, 16000]
 
 # 5. Ejecutar el graficador polar por índice más cercano
 graficar_patron_polar(
     frecuencias=frecs_0,          # Usamos el vector de frecs de 0° como base compartida
     lista_db=lista_curvas_db, 
     angulos=angulos_medidos, 
-    f_centro=frecuencia_objetivo)
+    f_centro=frecuencia_objetivo,
+    title="Directividad para el tercio de octava con centro 1000 Hz")
 
 comparar_patron_polar(
     frecuencias=frecs_0, 
     lista_db=lista_curvas_db, 
     angulos=angulos_medidos, 
     lista_f_centro=frecuencias_a_comparar,
-    title="Superposición de Directividad (500 Hz a 8 kHz)")
+    title="Directividad para distintas frecuencias")
 
 comparar_db(frecs_0, lista_curvas_db, labels=angulos_labels,
             title="Valores de presion sonora para distintas angulaturas", ylabel='dB SPL')

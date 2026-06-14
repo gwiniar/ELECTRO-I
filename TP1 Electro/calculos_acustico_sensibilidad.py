@@ -28,9 +28,10 @@ print(f"Offset calculado para el escalado: {offset:+.2f} dB")
 # 5. Graficar la comparación final
 comparar_db(
     frecs_completo, 
-    [spl_completo, spl_filtrado_corregido, spl_escalado], 
-    labels=['sin filtrar original', '10 a 10fs -6dB', 'sin filtrar escalado'],
+    [spl_filtrado_corregido, spl_completo], 
+    labels=['Señal filtrada de fs a 10*fs (con corrección -6 dB)', 'Señal sin filtrar'],
+    title='Comparación de respuestas en frecuencia para el cálculo de offset',
     ylabel='dB SPL'
 )
 
-graficar_db(frecs_completo, spl_escalado, title='sensibilidad')
+graficar_db(frecs_completo, spl_escalado, title='Sensibilidad (1 W - 1 m) del altoparlante', ylabel='dB SPL')
