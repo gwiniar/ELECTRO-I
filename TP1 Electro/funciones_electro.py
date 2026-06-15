@@ -118,7 +118,7 @@ def graficar_ohm(frecuencias, magnitudes, title="Respuesta de Magnitud (Impedanc
     mag_start = magnitudes[0]
     if mag_start <= limite_y:
         plt.scatter(f_start, mag_start, color='k', s=0, zorder=4)
-        plt.annotate(f'Re = {mag_start:.1f} $\\Omega$', 
+        plt.annotate(f'Re = {mag_start:.2f} $\\Omega$', 
                      xy=(f_start, mag_start), 
                      xytext=(20, -20), textcoords='offset points',
                      fontsize=9, fontweight='bold', color='k',
@@ -131,7 +131,7 @@ def graficar_ohm(frecuencias, magnitudes, title="Respuesta de Magnitud (Impedanc
     if mag_res <= limite_y:
         plt.scatter(f_res, mag_res, color='k', s=0, zorder=4)
         # xytext=(0, 40) tira la flecha recto desde arriba para no pisar las laderas
-        plt.annotate(f'Resonancia\n({f_res:.1f} Hz, {mag_res:.1f} $\\Omega$)', 
+        plt.annotate(f'Resonancia\n({f_res:.2f} Hz, {mag_res:.2f} $\\Omega$)', 
                      xy=(f_res, mag_res), 
                      xytext=(0, 40), textcoords='offset points',
                      fontsize=10, fontweight='bold', color='k',
@@ -144,7 +144,7 @@ def graficar_ohm(frecuencias, magnitudes, title="Respuesta de Magnitud (Impedanc
     if mag_zmin <= limite_y:
         plt.scatter(f_zmin, mag_zmin, color='k', s=0, zorder=4)
         # Se desplaza arriba y a la derecha para librar la zona del valle
-        plt.annotate(f'$Z_{{min}}$\n({f_zmin:.1f} Hz, {mag_zmin:.1f} $\\Omega$)', 
+        plt.annotate(f'$Z_{{min}}$\n({f_zmin:.2f} Hz, {mag_zmin:.2f} $\\Omega$)', 
                      xy=(f_zmin, mag_zmin), 
                      xytext=(30, -35), textcoords='offset points',
                      fontsize=10, fontweight='bold', color='k',
@@ -196,7 +196,7 @@ def graficar_fase(frecuencias, fases, magnitudes, title="Respuesta de Fase"):
         
     # Dibujamos una línea vertical punteada en la frecuencia de resonancia
     plt.axvline(x=f_res, color='k', linestyle='--', alpha=0.7, linewidth=1.5, zorder=2)
-    plt.text(f_res * 1.1, 150, f'$f_s$: {f_res:.1f} Hz', 
+    plt.text(f_res * 1.1, 150, f'$f_s$: {f_res:.2f} Hz', 
              fontsize=10, fontweight='bold', color='k', 
              bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
 
@@ -244,7 +244,7 @@ def comparar_impedancias(frecuencias, mags_1, mags_2, title="Comparación de Imp
         plt.scatter(f_res1, mag_res1, color='k', s=0, zorder=4)
             
         # xytext=(100, 35) significa: mover 100 píxeles a la izquierda y 35 hacia arriba desde el pico
-        plt.annotate(f'({f_res1:.1f} Hz, {mag_res1:.1f} $\\Omega$)', 
+        plt.annotate(f'({f_res1:.2f} Hz, {mag_res1:.2f} $\\Omega$)', 
                      xy=(f_res1, mag_res1), 
                      xytext=(100, 35), textcoords='offset points',
                      fontsize=9, fontweight='bold', color='k',
@@ -257,7 +257,7 @@ def comparar_impedancias(frecuencias, mags_1, mags_2, title="Comparación de Imp
         if mag_res2 <= limite_y:
             plt.scatter(f_res2, mag_res2, color='k', s=0, zorder=4)
             
-            plt.annotate(f'({f_res2:.1f} Hz, {mag_res2:.1f} $\\Omega$)', 
+            plt.annotate(f'({f_res2:.2f} Hz, {mag_res2:.2f} $\\Omega$)', 
                          xy=(f_res2, mag_res2), 
                          xytext=(-100, 35), textcoords='offset points',
                          fontsize=9, fontweight='bold', color='k',
@@ -275,8 +275,7 @@ def comparar_impedancias(frecuencias, mags_1, mags_2, title="Comparación de Imp
 # --- FUNCIONES DE GRAFICACION ACUSTICA ---
 def promedio_logaritmico_butterworth(frecuencias, valores_db, f_inf, f_sup):
     """
-    Calcula el promedio energético ponderado por un filtro Butterworth 
-    de 4to orden (24 dB/oct) para aislar la banda de interés.
+    Calculates the logarithmic energy average weighted by a 4th-order Butterworth filter.
     """
     # 1. Generar el filtro interno
     h_hp2 = 1.0 / (1.0 + (f_inf / frecuencias) ** 8)
@@ -290,45 +289,78 @@ def promedio_logaritmico_butterworth(frecuencias, valores_db, f_inf, f_sup):
     return 10 * np.log10(promedio_energia)
 
 
-def escalar_curva(frecuencias, spl_curva, f_s, promedio_filtrado_1m):
+def encontrar_desviacion(frecuencias, valores_db, f_inf, f_sup):
     """
-    Ancla y escala una curva completa de respuesta en frecuencia basándose en
-    una medición física real filtrada con un Butterworth de 24 dB/oct en la banda f_s a 10x f_s.
-    
-    - frecuencias: Array de NumPy con el espectro completo de frecuencias.
-    - spl_curva: Array de NumPy con la curva relativa (ej: la que da 10 dB).
-    - f_s: Frecuencia de resonancia o límite inferior del filtro.
-    - promedio_filtrado_1m: Nivel SPL (dB) medido físicamente con el ruido rosa filtrado (corregido a 1m).
+    Encuentra el valor máximo, mínimo y sus respectivas frecuencias
+    dentro de una banda de interés [f_inf, f_sup].
     
     Returns:
-    - spl_escalado: Array de NumPy con la curva final calibrada en SPL real.
+    - f_max: Frecuencia del pico máximo (Hz).
+    - v_max: Valor máximo en dB SPL.
+    - f_min: Frecuencia del valle mínimo (Hz).
+    - v_min: Valor mínimo en dB SPL.
+    - span: Desviación total pico a pico (dB).
+    """
+    # 1. Asegurar que sean arrays de NumPy
+    frecuencias = np.array(frecuencias)
+    valores_db = np.array(valores_db)
+    
+    # 2. Crear la máscara para aislar la banda
+    mascara = (frecuencias >= f_inf) & (frecuencias <= f_sup)
+    
+    # 3. Filtrar los vectores aplicando la máscara
+    frecs_banda = frecuencias[mascara]
+    db_banda = valores_db[mascara]
+    
+    if len(db_banda) == 0:
+        raise ValueError("Error: No hay datos en el rango de frecuencias especificado.")
+    
+    # 4. Encontrar los índices del máximo y mínimo dentro de la banda
+    idx_max = np.argmax(db_banda)
+    idx_min = np.argmin(db_banda)
+    
+    # 5. Extraer los valores correspondientes
+    f_max = frecs_banda[idx_max]
+    v_max = db_banda[idx_max]
+    
+    f_min = frecs_banda[idx_min]
+    v_min = db_banda[idx_min]
+    
+    # 6. Calcular la variación total pico a pico
+    span = v_max - v_min
+    
+    return f_max, v_max, f_min, v_min, span
+
+
+def escalar_curva(frecuencias, spl_curva_completa, f_s, spl_curva_referencia):
+    """
+    Ancla y escala una curva teórica basándose en el espectro de una medición física real,
+    procesando AMBOS arrays con el mismo filtro Butterworth de 24 dB/oct.
+    
+    - frecuencias: Array de NumPy con el espectro común de frecuencias.
+    - spl_curva_completa: Array con la curva relativa a escalar (ej. datos de simulación).
+    - f_s: Frecuencia de resonancia o límite inferior del filtro.
+    - spl_curva_referencia: Array con el espectro de la medición real de la curva de referencia (ya corregida a 1m!).
+    
+    Returns:
+    - spl_escalado: Curva completa calibrada en SPL real.
     - offset: El offset calculado en dB.
     """
-    # 1. Definir las frecuencias de corte del filtro banda
+    # 1. Definir los límites de la banda de paso (f_s a 10x f_s)
     f_inf = f_s
     f_sup = 10.0 * f_s
     
-    # 2. Generar la respuesta en frecuencia del filtro Butterworth de 4to orden (24 dB/oct)
-    # Usamos el exponente 8 porque la ecuación de potencia es 2 * orden (2 * 4 = 8)
-    h_hp2 = 1.0 / (1.0 + (f_inf / frecuencias) ** 8)  # Pasa-Altos
-    h_lp2 = 1.0 / (1.0 + (frecuencias / f_sup) ** 8)  # Pasa-Bajos
-    filtro_energia = h_hp2 * h_lp2                    # Filtro Banda Completo
+    # 2. Calcular el promedio energético de la curva TEÓRICA
+    promedio_curva_completa = promedio_logaritmico_butterworth(frecuencias, spl_curva_completa, f_inf, f_sup)
     
-    # 3. Pasar la curva relativa a escala lineal de energía (presión al cuadrado)
-    energia_curva = 10 ** (spl_curva / 10.0)
+    # 3. Calcular el promedio energético de la curva MEDIDA (¡Tu mejora!)
+    promedio_curva_referencia = promedio_logaritmico_butterworth(frecuencias, spl_curva_referencia, f_inf, f_sup)
     
-    # 4. Promediado acústico real emulando el filtro
-    # ¡OJO! Si hiciéramos np.mean(), los ceros de los extremos diluirían el valor según el largo del array.
-    # Usamos un promedio PONDERADO: dividimos la energía filtrada por la suma del filtro.
-    # Esto hace que la función sea 100% inmune al ancho de banda del vector.
-    promedio_energia_banda = np.sum(energia_curva * filtro_energia) / np.sum(filtro_energia)
-    promedio_curva_banda = 10 * np.log10(promedio_energia_banda)
+    # 4. El offset es la diferencia pura entre ambos promedios procesados bajo la misma ventana
+    offset = promedio_curva_completa - promedio_curva_referencia
     
-    # 5. Calcular el Offset (Diferencia entre lo real físico y lo emulado por el filtro)
-    offset = promedio_filtrado_1m - promedio_curva_banda
-    
-    # 6. Escalado: Sumamos el offset a TODA la curva original
-    spl_escalado = spl_curva + offset
+    # 5. Escalado de la curva original
+    spl_escalado = spl_curva_completa - offset
     
     return spl_escalado, offset
 
@@ -579,7 +611,7 @@ def comparar_patron_polar(frecuencias, lista_db, angulos, lista_f_centro, title=
             max_atenuacion_global = min_val
             
         # --- EL CAMBIO SOLICITADO AQUÍ: SE USA F_CENTRO NOMINAL EN VEZ DE F_REAL ---
-        label_f = f"{f_centro} Hz" if f_centro < 1000 else f"{f_centro/1000:.1f} kHz".replace(".0", "")
+        label_f = f"{f_centro} Hz" if f_centro < 1000 else f"{f_centro/1000:.2f} kHz".replace(".0", "")
         # --------------------------------------------------------------------------
         
         # Graficar esta línea en el plano común
