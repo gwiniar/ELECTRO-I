@@ -1,5 +1,4 @@
 from funciones_electro import importar_datos_smaart, comparar_db, graficar_patron_polar, comparar_patron_polar
-import numpy as np
 
 # 1. Importar los datos por tercios de octava para cada ángulo
 frecs_0, spl_0 = importar_datos_smaart(r"Acústico\polar x tercios\0° tercios.txt")
